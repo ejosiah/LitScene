@@ -14,7 +14,8 @@ uniform vec4 bgColor;
 uniform vec3 eyes;
 uniform vec3 lightPos;
 uniform Box aabb;
-uniform uint NO_OF_TRIANGLES;
+uniform float NO_OF_TRIANGLES;
+uniform float NO_OF_VERTICES;
 
 //layout(binding=1) uniform samplerBuffer vertices_tbo;
 //layout(binding=2) uniform isamplerBuffer triangle_tbo;
@@ -99,13 +100,13 @@ vec4 intersectTriangle(vec3 origin, vec3 dir, int index,  out vec3 normal ) {
     vec3 v1 = texelFetch(vertices_tbo, i.y).xyz;
     vec3 v2 = texelFetch(vertices_tbo, i.z).xyz;*/
 
-	ivec4 i = texture(triangle_tbo, vec2((index+0.5)/38.0, 0.5));
+	ivec4 i = texture(triangle_tbo, vec2((index+0.5)/NO_OF_TRIANGLES, 0.5));
 	if((index+1) % 2 !=0 ) { 
 		i.xyz = i.zxy;
 	}  
-	vec3 v0 = texture(vertices_tbo, vec2((i.z + 0.5 )/28.0, 0.5)).xyz;
-	vec3 v1 = texture(vertices_tbo, vec2((i.y + 0.5 )/28.0, 0.5)).xyz;
-	vec3 v2 = texture(vertices_tbo, vec2((i.x + 0.5 )/28.0, 0.5)).xyz;
+	vec3 v0 = texture(vertices_tbo, vec2((i.z + 0.5 )/NO_OF_VERTICES, 0.5)).xyz;
+	vec3 v1 = texture(vertices_tbo, vec2((i.y + 0.5 )/NO_OF_VERTICES, 0.5)).xyz;
+	vec3 v2 = texture(vertices_tbo, vec2((i.x + 0.5 )/NO_OF_VERTICES, 0.5)).xyz;
 
 	vec3 e1 = v1-v0;
 	vec3 e2 = v2-v0;
@@ -196,7 +197,7 @@ void main()
 			vec3 hit = eyeRay.origin + eyeRay.dir*val.x;
 
 			//cast a random ray from the light position
-			vec3  jitteredLight  =  lightPos +  uniformlyRandomVector(gl_FragCoord.x);
+			vec3  jitteredLight  =  lightPos; //+  uniformlyRandomVector(gl_FragCoord.x);
 
 			//get the light vector
 			vec3 L = (jitteredLight.xyz-hit);

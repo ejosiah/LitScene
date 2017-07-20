@@ -38,7 +38,6 @@ public:
 		stringstream ss;
 		ss << "light(" << p.x << ", " << p.y << ", " << p.z << ")";
 		logger.info(ss.str());
-		glClearColor(1, 1, 1, 0);
 	}
 
 	void setOrientation(Orientation orientation) {
@@ -97,6 +96,15 @@ public:
 			s.send(lightModel);
 		});
 	//	lightController->setOrientation(inverse(quat_cast(cam.view)));
+		shader("raytrace_render")([&](Shader& s) {
+			vec3 min = model->bound->min();
+			vec3 max = model->bound->max();
+			s.sendUniform3fv("aabb.min", 1, value_ptr(min));
+			s.sendUniform3fv("aabb.max", 1, value_ptr(max));
+			s.sendUniform4fv("bgColor", 1, value_ptr(bg));
+
+		});
+		glClearColor(bg.x, bg.y, bg.z, bg.w);
 		
 	}
 
@@ -122,7 +130,8 @@ public:
 			{1, 1},
 			{0, 1}
 		};
-		mesh.primitiveType = GL_TRIANGLE_FAN;
+		mesh.indices = { 0,1,2,0,2,3 };
+	//	mesh.primitiveType = GL_TRIANGLE_FAN;
 		quad = new ProvidedMesh(mesh);
 
 	}
@@ -197,16 +206,9 @@ public:
 		//	triangle_tbo = new TextureBuffer(&indices[0], sizeof(int) * indices.size(), GL_RGBA32I, 2);
 			s.sendUniform1ui("triangle_tbo", 2);
 
-			s.sendUniform4f("bgColor", 1, 1, 1, 1);
-			vec3 pos = light[0].position.xyz;
-			s.sendUniform3f("lightPos", pos.x, pos.y, pos.z);
-			vec3 min = model->bound->min();
-
-			s.sendUniform3f("aabb.min", min.x, min.y, min.z);
-			vec3 max = model->bound->max();
-			s.sendUniform3f("aabb.max", max.y, max.y, max.z);
 			unsigned int noOfTriangles = indices.size() / 4;
-			s.sendUniform1ui("NO_OF_TRIANGLES", noOfTriangles);
+			s.sendUniform1f("NO_OF_TRIANGLES", noOfTriangles);
+			s.sendUniform1f("NO_OF_VERTICES", uniqueVertices.size());
 		});
 
 	}
@@ -260,6 +262,9 @@ public:
 	}
 
 	virtual void display() override{
+		cam.view = translate(mat4(1), { 0, 0, dist });
+		cam.view = rotate(cam.view, radians(pitch), { 1, 0, 0 });
+		cam.view = rotate(cam.view, radians(yaw), { 0, 1, 0 });
 		
 		switch (lightType) {
 		case PHONG:
@@ -292,9 +297,7 @@ public:
 	}
 
 	void renderRayTrace() {
-		cam.view = translate(mat4(1), { 0, 0, dist });
-		cam.view = rotate(cam.view, radians(pitch), { 1, 0, 0 });
-		cam.view = rotate(cam.view, radians(yaw), { 0, 1, 0 });
+		vec3 lightPos =  vec3(light[0].position);
 		mat4 invMV = inverse(cam.view);
 		mat4 invMVP = inverse(cam.projection * cam.view);
 		vec3 eyes = column(invMV, 3).xyz;
@@ -310,10 +313,11 @@ public:
 		//});
 
 		shader("raytrace_render")([&](Shader& s) {
-			//glActiveTexture(GL_TEXTURE0);
-			//glBindTexture(GL_TEXTURE_2D, scene_img);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, textureMap);
 			//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			s.sendUniform3fv("lightPos", 1, &lightPos[0]);
 			s.sendUniform3fv("eyes", 1, &eyes[0]);
 			s.sendUniformMatrix4fv("invMVP", 1, GL_FALSE, value_ptr(invMVP));
 		//	s.sendUniform1ui("scene_img", scene_img);
@@ -382,6 +386,7 @@ private:
 	int lightType;
 	string currentLightType;
 	GLuint scene_img;
+	vec4 bg = vec4(0.5, 0.5, 1, 1);
 	float theta = 0.66f;
 	float phi = -1.0f;
 	float radius = 70;
