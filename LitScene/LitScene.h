@@ -84,9 +84,7 @@ public:
 		buildTBOs();
 		initRayTraceImage();
 		crossHair = new CrossHair(5);
-		cam.view = translate(mat4(1), { 0, 0, dist });
-		cam.view = rotate(cam.view, radians(pitch), { 1, 0, 0 });
-		cam.view = rotate(cam.view, radians(yaw), { 0, 1, 0 });
+
 		light[0].on = true;
 		light[0].transform = true;
 	//	light[0].position = vec4{ 0, 30, 0, 1.0};
@@ -146,7 +144,7 @@ public:
 				indices.push_back(mesh.indices[j] + offset);
 				indices.push_back(mesh.indices[j + 1] + offset);
 				indices.push_back(mesh.indices[j + 2] + offset);
-			//	indices.push_back(textures[i]);	
+				indices.push_back(textures[i]);	
 
 			}
 			offset += mesh.positions.size();
@@ -161,30 +159,40 @@ public:
 			});
 			if (itr == uniqueVertices.end()) {
 				uniqueVertices.push_back(vo);
-				set<int> tIndices;
-				
-				for (int j = 0; j < indices.size(); j++) {
-				//	if (j % 3 == 0) continue;
-					int idx = indices[j];
-					vec4 v1 = vertices[idx];
-					if ((vo.x == v1.x && vo.y == v1.y && vo.z == v1.z && vo.w == v1.w)) {
-						tIndices.insert(idx);
-					}
-				}
-				tIndices;
-				int minIdx = *tIndices.begin();
-				for (int j = 0; j < indices.size(); j++) {
-					int idx = indices[j];
-					auto itr = find(tIndices.begin(), tIndices.end(), idx);
-					if (itr != tIndices.end()) {
-						indices[j] = minIdx;
-					}
-				}
 			}
 		}
 
+		for (int i = 0; i < uniqueVertices.size(); i++) {
+			set<int> tIndices;
+			vec4 vo = uniqueVertices[i];
+			for (int j = 0; j < indices.size(); j++) {
+				if ((j+1) % 4 == 0) continue;
+				int idx = indices[j];
+				vec4 v1 = vertices[idx];
+				if ((vo.x == v1.x && vo.y == v1.y && vo.z == v1.z && vo.w == v1.w)) {
+					indices[j] = i;
+				}
+			}
+			//tIndices;
+			//int minIdx = *tIndices.begin();
+			//stringstream ss;
+			//ss << minIdx << " -> { ";
+			//for (int idx : tIndices) {
+			//	ss << idx << " ";
+			//}
+			//ss << "}";
+			//logger.info(ss.str());
+			//for (int j = 0; j < indices.size(); j++) {
+			//	int idx = indices[j];
+			//	auto itr = find(tIndices.begin(), tIndices.end(), idx);
+			//	if (itr != tIndices.end()) {
+			//		indices[j] = minIdx;
+			//	}
+			//}
+		}
+
 		shader("raytrace_render")([&](Shader& s) {
-			vertices_tbo = new TextureBuffer(&vertices[0], sizeof(vec4) * vertices.size(), GL_RGBA32F, 1);
+			vertices_tbo = new TextureBuffer(&vertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
 			s.sendUniform1ui("vertices_tbo", 1);
 			
 			triangle_tbo = new TextureBuffer(&indices[0], sizeof(float) * indices.size(), GL_RGBA32F, 2);
@@ -194,6 +202,7 @@ public:
 			vec3 pos = light[0].position.xyz;
 			s.sendUniform3f("lightPos", pos.x, pos.y, pos.z);
 			vec3 min = model->bound->min();
+
 			s.sendUniform3f("aabb.min", min.x, min.y, min.z);
 			vec3 max = model->bound->max();
 			s.sendUniform3f("aabb.max", max.y, max.y, max.z);
@@ -282,6 +291,9 @@ public:
 	}
 
 	void renderRayTrace() {
+		cam.view = translate(mat4(1), { 0, 0, dist });
+		cam.view = rotate(cam.view, radians(pitch), { 1, 0, 0 });
+		cam.view = rotate(cam.view, radians(yaw), { 0, 1, 0 });
 		mat4 invMV = inverse(cam.view * cam.model);
 		mat4 invMVP = inverse(cam.projection * cam.view * cam.model);
 		vec3 eyes = column(invMV, 3).xyz;
@@ -297,10 +309,10 @@ public:
 		//});
 
 		shader("raytrace_render")([&](Shader& s) {
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, scene_img);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			//glActiveTexture(GL_TEXTURE0);
+			//glBindTexture(GL_TEXTURE_2D, scene_img);
+			//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			s.sendUniform3fv("eyes", 1, &eyes[0]);
 			s.sendUniformMatrix4fv("invMVP", 1, GL_FALSE, value_ptr(invMVP));
 		//	s.sendUniform1ui("scene_img", scene_img);
