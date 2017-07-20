@@ -43,5 +43,14 @@
     <None Include="..\shaders\render.frag">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="..\shaders\raytrace.comp">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\shaders\raytrace_render.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="..\shaders\raytrace_render.frag">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>
