@@ -68,8 +68,8 @@ public:
 		_useImplictShaderLoad = true;
 		addShader("flat", GL_VERTEX_SHADER, identity_vert_shader);
 		addShader("flat", GL_FRAGMENT_SHADER, identity_frag_shader);
-		lightController = new LightController(light[0]);
-		_motionEventHandler = lightController;
+	//	lightController = new LightController(light[0]);
+	//	_motionEventHandler = lightController;
 		lightType = RAY_TRACE;
 	}
 
@@ -96,7 +96,7 @@ public:
 		shader("render")([&](Shader& s) {
 			s.send(lightModel);
 		});
-		lightController->setOrientation(inverse(quat_cast(cam.view)));
+	//	lightController->setOrientation(inverse(quat_cast(cam.view)));
 		
 	}
 
@@ -131,12 +131,15 @@ public:
 		vector<Mesh> meshes = model->getMeshes();
 		vector<vec4> vertices;
 		vector<int> indices;
+		vector<vec3> normals;
 		GLuint offset = 0;
 		auto textures = loadMatrials(meshes);
-		for (int i = 0; i < meshes.size(); i++) {
+		for (int i = 0; i < meshes.size() -1; i++) {
 			Mesh& mesh = meshes[i];
-			for (vec3& v : mesh.positions) {
-				vertices.push_back(vec4(v, 0));
+			for (int k = 0; k < mesh.positions.size(); k++) {
+				vec4 v = vec4(mesh.positions[k], 0);
+				vertices.push_back(v);
+				normals.push_back(mesh.normals[k]);
 			}
 			size_t size = mesh.indices.size();
 			logger.info("size: " + to_string(size));
@@ -150,6 +153,7 @@ public:
 			offset += mesh.positions.size();
 		}
 
+		Mesh mesh;
 		vector<vec4> uniqueVertices;
 		vector<int> newIndices;
 		for (int i = 0; i < vertices.size(); i++) {
@@ -159,6 +163,8 @@ public:
 			});
 			if (itr == uniqueVertices.end()) {
 				uniqueVertices.push_back(vo);
+				mesh.positions.push_back(vo.xyz);
+				mesh.normals.push_back(normals[i]);
 			}
 		}
 
@@ -190,6 +196,13 @@ public:
 			//	}
 			//}
 		}
+
+
+		for (int i = 0; i < indices.size(); i++) {
+			if ((i + 1) % 4 == 0) continue;
+			mesh.indices.push_back(indices[i]);
+		}
+		model2 = new ProvidedMesh(mesh);
 
 		shader("raytrace_render")([&](Shader& s) {
 			vertices_tbo = new TextureBuffer(&vertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
@@ -262,7 +275,6 @@ public:
 
 	virtual void display() override{
 		
-		renderCrossHair();
 		switch (lightType) {
 		case PHONG:
 			renderRaster();
@@ -276,6 +288,9 @@ public:
 			break;
 		}
 		renderText();
+		glDisable(GL_DEPTH_TEST);
+		renderCrossHair();
+		glEnable(GL_DEPTH_TEST);
 		
 
 	}
@@ -285,7 +300,7 @@ public:
 			cam.model = mat4(1);
 			s.sendUniformLight("light[0]", light[0]);
 			s.sendComputed(cam);
-			model->draw(s);
+			model2->draw(s);
 		});
 
 	}
@@ -367,6 +382,7 @@ public:
 private:
 	Model* model;
 	ProvidedMesh* quad;
+	ProvidedMesh* model2;
 	CrossHair* crossHair;
 	LightController* lightController;
 	Logger logger = Logger::get("LitScene");
