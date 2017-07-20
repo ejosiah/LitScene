@@ -130,7 +130,7 @@ public:
 	void buildTBOs() {
 		vector<Mesh> meshes = model->getMeshes();
 		vector<vec4> vertices;
-		vector<float> indices;
+		vector<int> indices;
 		GLuint offset = 0;
 		auto textures = loadMatrials(meshes);
 		for (int i = 0; i < meshes.size(); i++) {
@@ -195,7 +195,7 @@ public:
 			vertices_tbo = new TextureBuffer(&vertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
 			s.sendUniform1ui("vertices_tbo", 1);
 			
-			triangle_tbo = new TextureBuffer(&indices[0], sizeof(float) * indices.size(), GL_RGBA32F, 2);
+			triangle_tbo = new TextureBuffer(&indices[0], sizeof(int) * indices.size(), GL_RGBA32I, 2);
 			s.sendUniform1ui("triangle_tbo", 2);
 
 			s.sendUniform4f("bgColor", 1, 1, 1, 1);
@@ -294,8 +294,8 @@ public:
 		cam.view = translate(mat4(1), { 0, 0, dist });
 		cam.view = rotate(cam.view, radians(pitch), { 1, 0, 0 });
 		cam.view = rotate(cam.view, radians(yaw), { 0, 1, 0 });
-		mat4 invMV = inverse(cam.view * cam.model);
-		mat4 invMVP = inverse(cam.projection * cam.view * cam.model);
+		mat4 invMV = inverse(cam.view);
+		mat4 invMVP = inverse(cam.projection * cam.view);
 		vec3 eyes = column(invMV, 3).xyz;
 		//shader("raytrace")([&](Shader& s) {
 		//	glActiveTexture(GL_TEXTURE0);

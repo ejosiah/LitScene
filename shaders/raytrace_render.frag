@@ -17,7 +17,7 @@ uniform Box aabb;
 uniform uint NO_OF_TRIANGLES;
 
 layout(binding=1) uniform samplerBuffer vertices_tbo;
-layout(binding=2) uniform samplerBuffer triangle_tbo;
+layout(binding=2) uniform isamplerBuffer triangle_tbo;
 layout(binding=3) uniform sampler2DArray textureMap;
 
 //shader constants
