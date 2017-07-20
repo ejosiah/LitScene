@@ -190,20 +190,20 @@ public:
 			}
 		}
 
-
+		vector<vec4> newVertices;
 		for (int i = 0; i < indices.size(); i++) {
-			if ((i + 1) % 4 == 0) continue;
-			mesh.indices.push_back(indices[i]);
+		//	if ((i + 1) % 4 == 0) continue;
+		//	mesh.indices.push_back(indices[i]);
+	//		int idx = indices[i];
+	//		newVertices.push_back(uniqueVertices[idx]);
 		}
 		model2 = new ProvidedMesh(mesh);
 
 		shader("raytrace_render")([&](Shader& s) {
-			vertices_tbo = new Texture2D(&uniqueVertices[0], uniqueVertices.size(), 1, 1, GL_RGBA32F, GL_RGBA, GL_FLOAT);
-		//	vertices_tbo = new TextureBuffer(&vertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
+			vertices_tbo = new TextureBuffer(&uniqueVertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
 			s.sendUniform1ui("vertices_tbo", 1);
 			
-			triangle_tbo = new Texture2D(&indices[0], indices.size() / 4, 1, 2, GL_RGBA32I, GL_RGBA_INTEGER, GL_INT);
-		//	triangle_tbo = new TextureBuffer(&indices[0], sizeof(int) * indices.size(), GL_RGBA32I, 2);
+			triangle_tbo = new TextureBuffer(&indices[0], sizeof(int) * indices.size(), GL_RGBA32I, 2);
 			s.sendUniform1ui("triangle_tbo", 2);
 
 			unsigned int noOfTriangles = indices.size() / 4;
@@ -377,10 +377,8 @@ private:
 	LightController* lightController;
 	Logger logger = Logger::get("LitScene");
 	float pitch = 22, yaw = 116, dist = -120;
-//	TextureBuffer* triangle_tbo;
-//	TextureBuffer* vertices_tbo;
-	Texture2D* triangle_tbo;
-	Texture2D* vertices_tbo;
+	TextureBuffer* triangle_tbo;
+	TextureBuffer* vertices_tbo;
 	GLuint textureMap;
 	Font* font;
 	int lightType;

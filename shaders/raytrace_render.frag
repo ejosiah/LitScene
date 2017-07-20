@@ -17,16 +17,15 @@ uniform Box aabb;
 uniform float NO_OF_TRIANGLES;
 uniform float NO_OF_VERTICES;
 
-//layout(binding=1) uniform samplerBuffer vertices_tbo;
-//layout(binding=2) uniform isamplerBuffer triangle_tbo;
-layout(binding=1) uniform sampler2D vertices_tbo;
-layout(binding=2) uniform isampler2D triangle_tbo;
+layout(binding=1) uniform samplerBuffer vertices_tbo;
+layout(binding=2) uniform isamplerBuffer triangle_tbo;
 layout(binding=3) uniform sampler2DArray textureMap;
 
 //shader constants
 const float k0 = 1.0;	//constant attenuation
 const float k1 = 0.0;	//linear attenuation
 const float k2 = 0.0;	//quadratic attenuation
+const vec4 NO_HIT = vec4(-1, 0, 0, 0);
 
 smooth in vec2 uv;
 out vec4 fragColor;
@@ -94,19 +93,16 @@ vec3 uniformlyRandomVector(float seed)
 //z -> v texture coordinate
 //w -> texture map id
 vec4 intersectTriangle(vec3 origin, vec3 dir, int index,  out vec3 normal ) {
-/*
     ivec4 i = ivec4(texelFetch(triangle_tbo, index));
-    vec3 v0 = texelFetch(vertices_tbo, i.x).xyz;
-    vec3 v1 = texelFetch(vertices_tbo, i.y).xyz;
-    vec3 v2 = texelFetch(vertices_tbo, i.z).xyz;*/
 
-	ivec4 i = texture(triangle_tbo, vec2((index+0.5)/NO_OF_TRIANGLES, 0.5));
 	if((index+1) % 2 !=0 ) { 
 		i.xyz = i.zxy;
 	}  
-	vec3 v0 = texture(vertices_tbo, vec2((i.z + 0.5 )/NO_OF_VERTICES, 0.5)).xyz;
-	vec3 v1 = texture(vertices_tbo, vec2((i.y + 0.5 )/NO_OF_VERTICES, 0.5)).xyz;
-	vec3 v2 = texture(vertices_tbo, vec2((i.x + 0.5 )/NO_OF_VERTICES, 0.5)).xyz;
+
+    vec3 v0 = texelFetch(vertices_tbo, i.z).xyz;
+    vec3 v1 = texelFetch(vertices_tbo, i.y).xyz;
+    vec3 v2 = texelFetch(vertices_tbo, i.x).xyz;
+
 
 	vec3 e1 = v1-v0;
 	vec3 e2 = v2-v0;
@@ -120,22 +116,21 @@ vec4 intersectTriangle(vec3 origin, vec3 dir, int index,  out vec3 normal ) {
 	float u = dot(tvec, pvec) * inv_det;
 
 	if (u < 0.0 || u > 1.0)
-		return vec4(-1,0,0,0);
+		return NO_HIT;
 
 	vec3 qvec = cross(tvec, e1);
 
 	float v = dot(dir, qvec) * inv_det;
 
 	if (v < 0.0 || (u + v) > 1.0)
-		return vec4(-1,0,0,0);
+		return NO_HIT;
 
 	float t = dot(e2, qvec) * inv_det;
 	if((index+1) % 2 ==0 ) {
-		v = 1-v;
+		v = 1-v; 
 	} else {
 		u = 1-u;
-	}
-
+	} 
 	normal = normalize(cross(e2,e1));
 	return vec4(t,u,v,i.w);
 }
