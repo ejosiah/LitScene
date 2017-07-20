@@ -134,7 +134,7 @@ public:
 		vector<vec3> normals;
 		GLuint offset = 0;
 		auto textures = loadMatrials(meshes);
-		for (int i = 0; i < meshes.size() -1; i++) {
+		for (int i = 0; i < meshes.size(); i++) {
 			Mesh& mesh = meshes[i];
 			for (int k = 0; k < mesh.positions.size(); k++) {
 				vec4 v = vec4(mesh.positions[k], 0);
@@ -179,22 +179,6 @@ public:
 					indices[j] = i;
 				}
 			}
-			//tIndices;
-			//int minIdx = *tIndices.begin();
-			//stringstream ss;
-			//ss << minIdx << " -> { ";
-			//for (int idx : tIndices) {
-			//	ss << idx << " ";
-			//}
-			//ss << "}";
-			//logger.info(ss.str());
-			//for (int j = 0; j < indices.size(); j++) {
-			//	int idx = indices[j];
-			//	auto itr = find(tIndices.begin(), tIndices.end(), idx);
-			//	if (itr != tIndices.end()) {
-			//		indices[j] = minIdx;
-			//	}
-			//}
 		}
 
 
@@ -205,10 +189,12 @@ public:
 		model2 = new ProvidedMesh(mesh);
 
 		shader("raytrace_render")([&](Shader& s) {
-			vertices_tbo = new TextureBuffer(&vertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
+			vertices_tbo = new Texture2D(&uniqueVertices[0], uniqueVertices.size(), 1, 1, GL_RGBA32F, GL_RGBA, GL_FLOAT);
+		//	vertices_tbo = new TextureBuffer(&vertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
 			s.sendUniform1ui("vertices_tbo", 1);
 			
-			triangle_tbo = new TextureBuffer(&indices[0], sizeof(int) * indices.size(), GL_RGBA32I, 2);
+			triangle_tbo = new Texture2D(&indices[0], indices.size() / 4, 1, 2, GL_RGBA32I, GL_RGBA_INTEGER, GL_INT);
+		//	triangle_tbo = new TextureBuffer(&indices[0], sizeof(int) * indices.size(), GL_RGBA32I, 2);
 			s.sendUniform1ui("triangle_tbo", 2);
 
 			s.sendUniform4f("bgColor", 1, 1, 1, 1);
@@ -300,7 +286,7 @@ public:
 			cam.model = mat4(1);
 			s.sendUniformLight("light[0]", light[0]);
 			s.sendComputed(cam);
-			model2->draw(s);
+			model->draw(s);
 		});
 
 	}
@@ -387,8 +373,10 @@ private:
 	LightController* lightController;
 	Logger logger = Logger::get("LitScene");
 	float pitch = 22, yaw = 116, dist = -120;
-	TextureBuffer* triangle_tbo;
-	TextureBuffer* vertices_tbo;
+//	TextureBuffer* triangle_tbo;
+//	TextureBuffer* vertices_tbo;
+	Texture2D* triangle_tbo;
+	Texture2D* vertices_tbo;
 	GLuint textureMap;
 	Font* font;
 	int lightType;
