@@ -4,11 +4,13 @@
 #include <ncl/gl/CrossHair.h>
 #include <glm/gtx/euler_angles.hpp>
 #include <glm/gtc/matrix_access.hpp>
+#include <ncl/gl/geometry.h>
 #include <set>
 
 using namespace std;
 using namespace ncl;
 using namespace gl;
+using namespace gl::geom;
 using namespace glm;
 
 const static float _PI = pi<float>();
@@ -190,16 +192,30 @@ public:
 			}
 		}
 
-		vector<vec4> newVertices;
-		for (int i = 0; i < indices.size(); i++) {
-		//	if ((i + 1) % 4 == 0) continue;
-		//	mesh.indices.push_back(indices[i]);
-	//		int idx = indices[i];
-	//		newVertices.push_back(uniqueVertices[idx]);
+		vector<Triangle> triangles;
+		Triangle t;
+		t.p.n = vec3(1, 0, 0);
+		triangles.push_back(t);
+		for (int i = 0; i < indices.size(); i+=4) {
+			int idx = indices[i];
+			vec3 v0 = uniqueVertices[idx].xyz;
+			vec3 v1 = uniqueVertices[idx + 1].xyz;
+			vec3 v2 = uniqueVertices[idx + 2].xyz;
+			Triangle t(v0, v1, v2);
+			t.tid = idx + 3;
+			triangles.push_back(t);
+			stringstream ss;
+			ss << t;
+			logger.info(ss.str());
 		}
+
+		glGenBuffers(1, &triangleBufferId);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, triangleBufferId);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Triangle) * triangles.size(), &triangles[0], GL_STATIC_DRAW);
 		model2 = new ProvidedMesh(mesh);
 
 		shader("raytrace")([&](Shader& s) {
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, triangleBufferId);
 			vertices_tbo = new TextureBuffer(&uniqueVertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
 			s.sendUniform1ui("vertices_tbo", 1);
 			
@@ -379,6 +395,7 @@ private:
 	float pitch = 22, yaw = 116, dist = -120;
 	TextureBuffer* triangle_tbo;
 	TextureBuffer* vertices_tbo;
+	GLuint triangleBufferId;
 	GLuint textureMap;
 	Font* font;
 	int lightType;
