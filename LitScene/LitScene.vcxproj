@@ -161,6 +161,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\shaders\pathtrace.comp" />
     <None Include="..\shaders\raytrace.comp" />
     <None Include="..\shaders\raytrace_render.frag" />
     <None Include="..\shaders\raytrace_render.vert" />

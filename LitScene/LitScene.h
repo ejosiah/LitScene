@@ -5,6 +5,7 @@
 #include <glm/gtx/euler_angles.hpp>
 #include <glm/gtc/matrix_access.hpp>
 #include <set>
+#include <random>
 
 using namespace std;
 using namespace ncl;
@@ -13,7 +14,7 @@ using namespace glm;
 
 const static float _PI = pi<float>();
 
-static enum LightType { PHONG, RAY_TRACE, NO_OF_LIGHT_TYPES };
+static enum LightType { PHONG, RAY_TRACE, PATH_TRACE, NO_OF_LIGHT_TYPES };
 
 class LightController : public _3DMotionEventHandler {
 public:
@@ -96,9 +97,9 @@ public:
 			s.send(lightModel);
 		});
 	//	lightController->setOrientation(inverse(quat_cast(cam.view)));
-		shader("raytrace")([&](Shader& s) {
-			vec3 min = model->bound->min();
-			vec3 max = model->bound->max();
+		vec3 min = model->bound->min();
+		vec3 max = model->bound->max();
+		forShaders({ "raytrace", "pathtrace" }, [&](Shader& s) {
 			s.sendUniform3fv("aabb.min", 1, value_ptr(min));
 			s.sendUniform3fv("aabb.max", 1, value_ptr(max));
 			s.sendUniform4fv("bgColor", 1, value_ptr(bg));
@@ -198,13 +199,11 @@ public:
 	//		newVertices.push_back(uniqueVertices[idx]);
 		}
 		model2 = new ProvidedMesh(mesh);
-
-		shader("raytrace")([&](Shader& s) {
-			vertices_tbo = new TextureBuffer(&uniqueVertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
-			s.sendUniform1ui("vertices_tbo", 1);
-			
-			triangle_tbo = new TextureBuffer(&indices[0], sizeof(int) * indices.size(), GL_RGBA32I, 2);
-			s.sendUniform1ui("triangle_tbo", 2);
+		vertices_tbo = new TextureBuffer("vertices_tbo", &uniqueVertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
+		triangle_tbo = new TextureBuffer("triangle_tbo", &indices[0], sizeof(int) * indices.size(), GL_RGBA32I, 2);
+		forShaders({ "raytrace", "pathtrace" }, [&](Shader& s) {	
+			vertices_tbo->sendTo(s);
+			triangle_tbo->sendTo(s);
 
 			unsigned int noOfTriangles = indices.size() / 4;
 			s.sendUniform1f("NO_OF_TRIANGLES", noOfTriangles);
@@ -255,7 +254,7 @@ public:
 				meshTextureIdMap.insert(make_pair(i, 255));
 			}
 		}
-		shader("raytrace")([&](Shader& s) {
+		forShaders({ "raytrace", "pathtrace" }, [&](Shader& s) {
 			s.sendUniform1ui("textureMap", 3);
 		});
 		return meshTextureIdMap;
@@ -265,7 +264,7 @@ public:
 		cam.view = translate(mat4(1), { 0, 0, dist });
 		cam.view = rotate(cam.view, radians(pitch), { 1, 0, 0 });
 		cam.view = rotate(cam.view, radians(yaw), { 0, 1, 0 });
-		
+		stringstream ss;
 		switch (lightType) {
 		case PHONG:
 			renderRaster();
@@ -274,6 +273,14 @@ public:
 		case RAY_TRACE:
 			renderRayTrace();
 			currentLightType = "Lighting Type: Ray Trace";
+			break;
+		case PATH_TRACE:
+			pathTrace();
+			ss.str("");
+			ss.clear();
+			ss << "Lighting Type: Path Trace" << endl;
+			ss << "\tNo of samples: " << samples;
+			currentLightType = ss.str();
 			break;
 		default:
 			break;
@@ -311,6 +318,35 @@ public:
 			s.sendUniform3fv("eyes", 1, &eyes[0]);
 			s.sendUniformMatrix4fv("invMVP", 1, GL_FALSE, value_ptr(invMVP));
 			
+			glDispatchCompute(_width / 32, _height / 32, 1);
+		});
+
+		shader("raytrace_render")([&](Shader& s) {
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, scene_img);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+			s.sendUniform1ui("scene_img", scene_img);
+			quad->draw(s);
+		});
+	}
+
+	void pathTrace() {
+		vec3 lightPos = vec3(light[0].position);
+		mat4 invMV = inverse(cam.view);
+		mat4 invMVP = inverse(cam.projection * cam.view);
+		vec3 eyes = column(invMV, 3).xyz;
+		shader("pathtrace")([&](Shader& s) {
+			glActiveTexture(GL_TEXTURE0);
+			glBindImageTexture(0, scene_img, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+			s.sendUniform1ui("scene_img", scene_img);
+			s.sendUniform3fv("lightPos", 1, &lightPos[0]);
+			s.sendUniform3fv("eyes", 1, &eyes[0]);
+			s.sendUniform1i("SAMPLES", samples);
+			s.sendUniform1f("seed", float(rnd()));
+			s.sendUniformMatrix4fv("invMVP", 1, GL_FALSE, value_ptr(invMVP));
+
 			glDispatchCompute(_width / 32, _height / 32, 1);
 		});
 
@@ -388,5 +424,7 @@ private:
 	float theta = 0.66f;
 	float phi = -1.0f;
 	float radius = 70;
+	float samples = 3;
+	random_device rnd;
 
 };
