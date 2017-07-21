@@ -96,7 +96,7 @@ public:
 			s.send(lightModel);
 		});
 	//	lightController->setOrientation(inverse(quat_cast(cam.view)));
-		shader("raytrace_render")([&](Shader& s) {
+		shader("raytrace")([&](Shader& s) {
 			vec3 min = model->bound->min();
 			vec3 max = model->bound->max();
 			s.sendUniform3fv("aabb.min", 1, value_ptr(min));
@@ -199,7 +199,7 @@ public:
 		}
 		model2 = new ProvidedMesh(mesh);
 
-		shader("raytrace_render")([&](Shader& s) {
+		shader("raytrace")([&](Shader& s) {
 			vertices_tbo = new TextureBuffer(&uniqueVertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
 			s.sendUniform1ui("vertices_tbo", 1);
 			
@@ -235,7 +235,7 @@ public:
 		int textureId = 0;
 		for (int i = 0; i < meshes.size(); i++) {
 			Material& material = meshes[i].material;
-			if (material.diffuseMat != -1) {
+			if (!material.usingDefaultMat) {
 				auto itr = textures.find(material.diffuseTexPath);
 				if (itr == textures.end()) {
 					textures.insert(make_pair(material.diffuseTexPath, textureId));
@@ -255,7 +255,7 @@ public:
 				meshTextureIdMap.insert(make_pair(i, 255));
 			}
 		}
-		shader("raytrace_render")([&](Shader& s) {
+		shader("raytrace")([&](Shader& s) {
 			s.sendUniform1ui("textureMap", 3);
 		});
 		return meshTextureIdMap;
@@ -287,9 +287,11 @@ public:
 	}
 
 	void renderRaster() {
+		vec3 lightPos = vec3(light[0].position);
 		shader("render")([&](Shader& s) {
 			cam.model = mat4(1);
-			s.sendUniformLight("light[0]", light[0]);
+		//	s.sendUniformLight("light[0]", light[0]);
+			s.sendUniform3fv("lightPos", 1, &lightPos[0]);
 			s.sendComputed(cam);
 			model->draw(s);
 		});
@@ -301,26 +303,24 @@ public:
 		mat4 invMV = inverse(cam.view);
 		mat4 invMVP = inverse(cam.projection * cam.view);
 		vec3 eyes = column(invMV, 3).xyz;
-		//shader("raytrace")([&](Shader& s) {
-		//	glActiveTexture(GL_TEXTURE0);
-		//	glBindImageTexture(0, scene_img, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-
-		//	s.sendUniform1ui("scene_img", scene_img);
-		//	s.sendUniform3fv("eyes", 1, &eyes[0]);
-		//	s.sendUniformMatrix4fv("invMVP", 1, GL_FALSE, value_ptr(invMVP));
-		//	
-		//	glDispatchCompute(_width / 32, _height / 32, 1);
-		//});
-
-		shader("raytrace_render")([&](Shader& s) {
+		shader("raytrace")([&](Shader& s) {
 			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, textureMap);
-			//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			//glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glBindImageTexture(0, scene_img, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+			s.sendUniform1ui("scene_img", scene_img);
 			s.sendUniform3fv("lightPos", 1, &lightPos[0]);
 			s.sendUniform3fv("eyes", 1, &eyes[0]);
 			s.sendUniformMatrix4fv("invMVP", 1, GL_FALSE, value_ptr(invMVP));
-		//	s.sendUniform1ui("scene_img", scene_img);
+			
+			glDispatchCompute(_width / 32, _height / 32, 1);
+		});
+
+		shader("raytrace_render")([&](Shader& s) {
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, scene_img);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+			s.sendUniform1ui("scene_img", scene_img);
 			quad->draw(s);
 		});
 	}

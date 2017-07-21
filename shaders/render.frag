@@ -2,12 +2,22 @@
 #pragma debug(on)
 #pragma optimize(off)
 
-#pragma include("lighting.frag.glsl")
-#pragma include("ads_diffuse.glsl")
+layout(binding=11) uniform sampler2D diffuseMap;
 
-uniform mat4 V;
+in VERTEX{
+  smooth vec3 lightDir;
+  smooth vec3 normal;
+  smooth vec4 color;
+  smooth vec2 uv;
+} vertex_in;
+
 out vec4 fragColor;
 
 void main(){
-	fragColor = phongLightModel(V);
+	vec3 L = normalize(vertex_in.lightDir);
+	vec3 N = normalize(vertex_in.normal);
+
+	float diffuse = max(0, dot(L, N));
+
+	fragColor = diffuse * texture(diffuseMap, vertex_in.uv);
 }
