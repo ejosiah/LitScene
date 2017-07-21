@@ -33,7 +33,7 @@ const vec4 NO_HIT = vec4(-1, 0, 0, 0);
 
 vec2 getUV(){
 	vec2 uv = vec2(gl_GlobalInvocationID.xy)/(vec2(gl_NumWorkGroups.xy * gl_WorkGroupSize.xy) - vec2(1));
-	return 2 * uv - vec2(1);	// scale from [0, 1] to [-1, -]
+	return 2 * uv - vec2(1);	// scale from [0, 1] to [-1, -1]
 }
 
 float random(vec3 scale, float seed) {		
@@ -176,7 +176,7 @@ vec3 tracepath(vec3 origin, vec3 ray, vec3 light, float t){
 			diffuse = max(0, dot(L, N));
 			colorMask *= surfaceColor;
 
-			float inShadow = shadow(hit + N * 0.001, L);
+			float inShadow = shadow(hit + N * 0.0001, L);
 
 			accumulatedColor += colorMask * diffuse * inShadow;
 		}

@@ -344,7 +344,7 @@ public:
 			s.sendUniform3fv("lightPos", 1, &lightPos[0]);
 			s.sendUniform3fv("eyes", 1, &eyes[0]);
 			s.sendUniform1i("SAMPLES", samples);
-			s.sendUniform1f("seed", float(rnd()));
+			s.sendUniform1f("seed", float(Timer::get().now()));
 			s.sendUniformMatrix4fv("invMVP", 1, GL_FALSE, value_ptr(invMVP));
 
 			glDispatchCompute(_width / 32, _height / 32, 1);
@@ -425,6 +425,4 @@ private:
 	float phi = -1.0f;
 	float radius = 70;
 	float samples = 3;
-	random_device rnd;
-
 };
