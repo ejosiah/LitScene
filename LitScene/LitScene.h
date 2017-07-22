@@ -224,9 +224,29 @@ public:
 		for (int i = 0; i < indices.size(); i+= 4) {
 			
 			ray_tracing::Triangle tri;
-			tri.v0 = uniqueVertices[indices[i]];
-			tri.v1 = uniqueVertices[indices[i + 1]];
-			tri.v2 = uniqueVertices[indices[i + 2]];
+			vec3 v0 = uniqueVertices[indices[i]].xyz;
+			vec3 v1 = uniqueVertices[indices[i + 1]].xyz;
+			vec3 v2 = uniqueVertices[indices[i + 2]].xyz;
+
+			vec3 n = cross(v1 - v0, v2 - v0);
+			tri.p = { vec4(n, 0), dot(n, v0) };
+			tri.bc = { vec4(cross(n, v2 - v1), 0), dot(n, v1) };
+			tri.ca = { vec4(cross(n, v0 - v2), 0), dot(n, v2) };
+
+			n = tri.bc.n.xyz;
+			vec3 bcn  = n * (1.0f / (dot(v0, n) - tri.bc.d));
+			float d = tri.bc.d * (1.0f / (dot(v0, n) - tri.bc.d));
+
+			tri.bc.n = vec4(bcn, 0);
+			tri.bc.d = d;
+
+			n = tri.ca.n.xyz;
+			vec3 can = n * (1.0f / (dot(v0, n) - tri.ca.d));
+			d = tri.ca.d * (1.0f / (dot(v0, n) - tri.ca.d));
+
+			tri.ca.n = vec4(can, 0);
+			tri.ca.d = d;
+
 			tri.tid = indices[i + 3];
 			triangle_ssbo.triangles.push_back(tri);
 		}

@@ -15,8 +15,15 @@ struct Material {
     float opacity;
 };
 
+struct Plane{
+	vec4 n;
+	float d;
+};
+
 struct Triangle{
-    vec4 v0, v1, v2;
+    Plane p;
+	Plane bc;
+	Plane ca;
     Material material;
     float tid;
 };
@@ -99,44 +106,27 @@ void setup_camera(vec2 uv) {
 
 vec4 intersectTriangle(vec3 origin, vec3 dir, int index,  out vec3 normal ) {
     Triangle tri = triangles[index];
-    vec3 v0 = tri.v2.xyz;
-    vec3 v1 = tri.v1.xyz;
-    vec3 v2 = tri.v0.xyz;
+	
+	float distp = dot(origin, tri.p.n.xyz) - tri.p.d;
+	if(distp < 0) return NO_HIT;
 
-	if((index+1) % 2 !=0 ){
-	    v0 = tri.v1.xyz;
-        v1 = tri.v0.xyz;
-        v2 = tri.v2.xyz;
-	}
+	float distq = dot(origin + dir, tri.p.n.xyz) - tri.p.d;
+	if(distq >= 0.0f) return NO_HIT;
 
-	vec3 e1 = v1-v0;
-	vec3 e2 = v2-v0;
-	vec3 tvec = origin - v0;
+	float denom = distp - distq;
+	float t = distp / denom;
+	vec3 s = origin + t * dir;
 
-	vec3 pvec = cross(dir, e2);
-	float  det  = dot(e1, pvec);
+	float u = dot(s, tri.bc.n.xyz) - tri.bc.d;
+	if(u < 0 || u > 1) return NO_HIT;
 
-	float inv_det = 1.0/ det;
+	float v = dot(s, tri.ca.n.xyz) - tri.ca.d;
+	if(v < 0) return NO_HIT;
 
-	float u = dot(tvec, pvec) * inv_det;
+	float w = 1 - u - v;
+	if (w < 0) return NO_HIT;
 
-	if (u < 0.0 || u > 1.0)
-		return NO_HIT;
-
-	vec3 qvec = cross(tvec, e1);
-
-	float v = dot(dir, qvec) * inv_det;
-
-	if (v < 0.0 || (u + v) > 1.0)
-		return NO_HIT;
-
-	float t = dot(e2, qvec) * inv_det;
-	if((index+1) % 2 ==0 ) {
-		v = 1-v; 
-	} else {
-		u = 1-u;
-	} 
-	normal = normalize(cross(e2,e1));
+	normal = tri.p.n.xyz;
 	return vec4(t,u,v, tri.tid);
 }
 
@@ -201,5 +191,7 @@ void main()
 		}
 
 	}
+	vec4 color = triangles[0].p.n;
+	imageStore(scene_img, pos, color);
 }
 
