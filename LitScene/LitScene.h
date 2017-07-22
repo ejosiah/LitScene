@@ -218,11 +218,7 @@ public:
 			}
 		}
 
-		vector<vec4> newVertices;
-
-		ray_tracing::SSBOTriangleData triangle_ssbo;
 		for (int i = 0; i < indices.size(); i+= 4) {
-			
 			ray_tracing::Triangle tri;
 			tri.v0 = uniqueVertices[indices[i]];
 			tri.v1 = uniqueVertices[indices[i + 1]];
@@ -233,7 +229,7 @@ public:
 
 		glGenBuffers(1, &tri_ssbo);
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, tri_ssbo);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeOf(triangle_ssbo), &triangle_ssbo.triangles[0], GL_DYNAMIC_COPY);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeOf(triangle_ssbo), NULL, GL_DYNAMIC_COPY);
 
 		model2 = new ProvidedMesh(mesh);
 		vertices_tbo = new TextureBuffer("vertices_tbo", &uniqueVertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
@@ -348,6 +344,9 @@ public:
 		mat4 invMVP = inverse(cam.projection * cam.view);
 		vec3 eyes = column(invMV, 3).xyz;
 		shader("raytrace")([&](Shader& s) {
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, tri_ssbo);
+			glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeOf(triangle_ssbo), &triangle_ssbo.triangles[0]);
+			
 			glActiveTexture(GL_TEXTURE0);
 			glBindImageTexture(0, scene_img, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 			s.sendUniform1ui("scene_img", scene_img);
@@ -460,6 +459,7 @@ private:
 	string currentLightType;
 	GLuint scene_img;
 	GLuint tri_ssbo;
+	ray_tracing::SSBOTriangleData triangle_ssbo;
 	vec4 bg = vec4(0.5, 0.5, 1, 1);
 	float theta = 0.66f;
 	float phi = -1.0f;

@@ -152,6 +152,20 @@ float shadow(vec3 origin, vec3 dir ) {
 	return 1.0;
 }
 
+bool closestIntersectingTriangle(Ray ray, inout vec4 hit, out vec3 normal){
+    float t = hit.x;
+    vec3 N;
+    for(int i=0;i<int(NO_OF_TRIANGLES);i++)
+    {
+        vec4 res = intersectTriangle(ray.origin, ray.dir, i, N);
+        if(res.x>0 && res.x <= hit.x) {
+           hit = res;
+           normal = N;
+        }
+    }
+    return hit.x < t;
+}
+
 void main()
 {
 	ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
@@ -163,14 +177,14 @@ void main()
 	setup_camera(uv);
 
 	vec2 tNearFar = intersectCube(eyeRay.origin, eyeRay.dir,  aabb);
-
+    vec4 val;
+    vec3 N;
 	if(tNearFar.x<tNearFar.y  ) {
 
 		t = tNearFar.y+1; //offset the near intersection to remove the depth artifacts
 
-		vec4 val=vec4(t,0,0,0);
-		vec3 N;
-		
+		val=vec4(t,0,0,0);
+		/*
 		for(int i=0;i<int(NO_OF_TRIANGLES);i++)
 		{
 			vec3 normal;
@@ -179,13 +193,13 @@ void main()
 			   val = res;
 			   N = normal;
 		    }
-		}
-
+		}*/
+		bool intersectFound = closestIntersectingTriangle(eyeRay, val, N);
 		
-		if(val.x < t) {
+		if(intersectFound) {
 
 			vec3 hit = eyeRay.origin + eyeRay.dir*val.x;
-
+            N = normalize( N * (1 - val.y - val.z) + N * val.y + N * val.z);
 			vec3 L = (lightPos-hit);
 			float d = length(L);
 			L = normalize(L);
@@ -196,7 +210,12 @@ void main()
 			diffuse *= attenuationAmount;
 
 			float inShadow = shadow(hit+ N*0.0001, L) ;
-			vec4 color = inShadow*diffuse*mix(texture(textureMap, val.yzw), vec4(1), (val.w==255) );
+			vec4 color = inShadow * diffuse*mix(texture(textureMap, val.yzw), vec4(1), (val.w==255) );
+			vec3 r = vec3(1, 0, 0);
+			vec3 g = vec3(0, 1, 0);
+			vec3 b = vec3(0, 0, 1);
+
+		//	color = vec4( r * (1 - val.y - val.z) + g * val.y + b * val.z, 1);
             imageStore(scene_img, pos, color);
 		}
 
