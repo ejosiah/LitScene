@@ -1,11 +1,15 @@
 #pragma once
 
-#include <ncl/gl/Scene.h>
-#include <ncl/gl/CrossHair.h>
-#include <glm/gtx/euler_angles.hpp>
-#include <glm/gtc/matrix_access.hpp>
 #include <set>
 #include <random>
+
+#include <glm/gtx/euler_angles.hpp>
+#include <glm/gtc/matrix_access.hpp>
+
+#include <ncl/gl/Scene.h>
+#include <ncl/gl/CrossHair.h>
+#include <ncl/gl/rayTracingUtilities.h>
+
 
 using namespace std;
 using namespace ncl;
@@ -23,7 +27,7 @@ public:
 	}
 
 	virtual void onMotion(const _3DMotionEvent& event) override {
-		vec3 t = vec3(mat4_cast(orientation) * vec4(event.translation, 1));
+	//	vec3 t = vec3(mat4_cast(orientation) * vec4(event.translation, 1));
 		if (light.spotAngle < 180.0f) {
 			vec3 d = vec3(light.spotAngle);
 			float lim = _PI / 2;
@@ -34,11 +38,9 @@ public:
 			updatDirection();
 		}
 		
-		light.position += vec4(t  * 0.001f, 0);
-		vec4& p = light.position;
-		stringstream ss;
-		ss << "light(" << p.x << ", " << p.y << ", " << p.z << ")";
-		logger.info(ss.str());
+	//	light.position += vec4(t  * 0.001f, 0);
+	//	vec4& p = light.position;
+
 	}
 
 	void setOrientation(Orientation orientation) {
@@ -48,8 +50,7 @@ public:
 	}
 	
 	void updatDirection() {
-		vec3 d = normalize(mat3_cast(lightDirection) * vec3(0, -1, 0));
-		light.spotDirection = vec4(d, 0);
+
 	}
 
 	virtual void onNoMotion() override {
@@ -62,14 +63,39 @@ private:
 	Logger logger = Logger::get("LightController");
 };
 
+class CamController : public _3DMotionEventHandler {
+public:
+	CamController(float& yaw, float& pitch)
+	:yaw(yaw), pitch(pitch){
+	}
+
+	virtual void onMotion(const _3DMotionEvent& event) override {
+		reset(pitch += event.rotation.x * 0.005f);
+		reset(yaw += event.rotation.y * 0.005f);
+	}
+
+	void reset(float& angle) {
+		if (angle > 360) {
+			angle -= 360;
+		}
+		else if (angle < 0) {
+			angle += 360;
+		}
+	}
+
+	virtual void onNoMotion() override {
+
+	}
+private:
+	float &yaw, &pitch;
+};
+
 class LitScene : public Scene {
 public:
 	LitScene(): Scene("Lit scene", 1280, 960){
 		_useImplictShaderLoad = true;
 		addShader("flat", GL_VERTEX_SHADER, identity_vert_shader);
 		addShader("flat", GL_FRAGMENT_SHADER, identity_frag_shader);
-	//	lightController = new LightController(light[0]);
-	//	_motionEventHandler = lightController;
 		lightType = RAY_TRACE;
 	}
 
@@ -78,6 +104,7 @@ public:
 	}
 
 	virtual void init() override {
+		_motionEventHandler = new Chain3DMotionEventHandler({ new LightController(light[0]), new CamController(yaw, pitch) });
 		font = Font::Arial(12);
 		model = new Model("..\\media\\blocks.obj");
 		initQuad();
@@ -192,19 +219,29 @@ public:
 		}
 
 		vector<vec4> newVertices;
-		for (int i = 0; i < indices.size(); i++) {
-		//	if ((i + 1) % 4 == 0) continue;
-		//	mesh.indices.push_back(indices[i]);
-	//		int idx = indices[i];
-	//		newVertices.push_back(uniqueVertices[idx]);
+
+		ray_tracing::SSBOTriangleData triangle_ssbo;
+		for (int i = 0; i < indices.size(); i+= 4) {
+			
+			ray_tracing::Triangle tri;
+			tri.v0 = uniqueVertices[indices[i]];
+			tri.v1 = uniqueVertices[indices[i + 1]];
+			tri.v2 = uniqueVertices[indices[i + 2]];
+			tri.tid = indices[i + 3];
+			triangle_ssbo.triangles.push_back(tri);
 		}
+
+		glGenBuffers(1, &tri_ssbo);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, tri_ssbo);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeOf(triangle_ssbo), &triangle_ssbo.triangles[0], GL_DYNAMIC_COPY);
+
 		model2 = new ProvidedMesh(mesh);
 		vertices_tbo = new TextureBuffer("vertices_tbo", &uniqueVertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
 		triangle_tbo = new TextureBuffer("triangle_tbo", &indices[0], sizeof(int) * indices.size(), GL_RGBA32I, 2);
 		forShaders({ "raytrace", "pathtrace" }, [&](Shader& s) {	
 			vertices_tbo->sendTo(s);
 			triangle_tbo->sendTo(s);
-
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, tri_ssbo);
 			unsigned int noOfTriangles = indices.size() / 4;
 			s.sendUniform1f("NO_OF_TRIANGLES", noOfTriangles);
 			s.sendUniform1f("NO_OF_VERTICES", uniqueVertices.size());
@@ -337,6 +374,8 @@ public:
 		mat4 invMV = inverse(cam.view);
 		mat4 invMVP = inverse(cam.projection * cam.view);
 		vec3 eyes = column(invMV, 3).xyz;
+		float currentTime = Timer::get().now();
+		logger.info("currentTime: " + to_string(currentTime));
 		shader("pathtrace")([&](Shader& s) {
 			glActiveTexture(GL_TEXTURE0);
 			glBindImageTexture(0, scene_img, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
@@ -344,7 +383,7 @@ public:
 			s.sendUniform3fv("lightPos", 1, &lightPos[0]);
 			s.sendUniform3fv("eyes", 1, &eyes[0]);
 			s.sendUniform1i("SAMPLES", samples);
-			s.sendUniform1f("seed", float(Timer::get().now()));
+			s.sendUniform1f("seed", float(currentTime));
 			s.sendUniformMatrix4fv("invMVP", 1, GL_FALSE, value_ptr(invMVP));
 
 			glDispatchCompute(_width / 32, _height / 32, 1);
@@ -420,6 +459,7 @@ private:
 	int lightType;
 	string currentLightType;
 	GLuint scene_img;
+	GLuint tri_ssbo;
 	vec4 bg = vec4(0.5, 0.5, 1, 1);
 	float theta = 0.66f;
 	float phi = -1.0f;

@@ -4,12 +4,33 @@
 
 layout(local_size_x = 32, local_size_y = 32) in;
 
+struct Material {
+    vec4 ambient;
+    vec4 diffuse;
+    vec4 specular;
+    vec4 transmittance;
+    vec4 emission;
+    float shininess;
+    float ior;
+    float opacity;
+};
+
+struct Triangle{
+    vec4 v0, v1, v2;
+    Material material;
+    float tid;
+};
+
 struct Ray { vec3 origin, dir;} eyeRay;
 struct Box { vec3 min, max; };
 struct Camera{
 	vec3 U, V, W;
 	float d;
 } cam;
+
+layout(std430, binding=4) buffer TRIANGLES_SSBO{
+    Triangle triangles[38];
+};
 
 uniform mat4 invMVP;
 uniform vec4 bgColor;
@@ -28,10 +49,23 @@ const float k0 = 1.0;
 const float k1 = 0.0;
 const float k2 = 0.0;
 const vec4 NO_HIT = vec4(-1, 0, 0, 0);
+const float EPSILON = 0.000001;
 
 vec2 getUV(){
 	vec2 uv = vec2(gl_GlobalInvocationID.xy)/(vec2(gl_NumWorkGroups.xy * gl_WorkGroupSize.xy) - vec2(1));
-	return 2 * uv - vec2(1);	// scale from [0, 1] to [-1, -]
+	return 2 * uv - vec2(1);	// scale from [0, 1] to [-1, -1]
+}
+
+void swap(inout float a, inout float b){
+	float temp = a;
+	a = b;
+	b = temp;
+}
+
+void swap(inout vec3 a, inout vec3 b){
+	vec3 temp = a;
+	a = b;
+	b = temp;
 }
 
 vec2 intersectCube(vec3 origin, vec3 ray, Box cube) {
@@ -64,16 +98,16 @@ void setup_camera(vec2 uv) {
 
 
 vec4 intersectTriangle(vec3 origin, vec3 dir, int index,  out vec3 normal ) {
-    ivec4 i = ivec4(texelFetch(triangle_tbo, index));
+    Triangle tri = triangles[index];
+    vec3 v0 = tri.v2.xyz;
+    vec3 v1 = tri.v1.xyz;
+    vec3 v2 = tri.v0.xyz;
 
-	if((index+1) % 2 !=0 ) { 
-		i.xyz = i.zxy;
-	}  
-
-    vec3 v0 = texelFetch(vertices_tbo, i.z).xyz;
-    vec3 v1 = texelFetch(vertices_tbo, i.y).xyz;
-    vec3 v2 = texelFetch(vertices_tbo, i.x).xyz;
-
+	if((index+1) % 2 !=0 ){
+	    v0 = tri.v1.xyz;
+        v1 = tri.v0.xyz;
+        v2 = tri.v2.xyz;
+	}
 
 	vec3 e1 = v1-v0;
 	vec3 e2 = v2-v0;
@@ -103,7 +137,7 @@ vec4 intersectTriangle(vec3 origin, vec3 dir, int index,  out vec3 normal ) {
 		u = 1-u;
 	} 
 	normal = normalize(cross(e2,e1));
-	return vec4(t,u,v,i.w);
+	return vec4(t,u,v, tri.tid);
 }
 
 float shadow(vec3 origin, vec3 dir ) {
@@ -165,6 +199,7 @@ void main()
 			vec4 color = inShadow*diffuse*mix(texture(textureMap, val.yzw), vec4(1), (val.w==255) );
             imageStore(scene_img, pos, color);
 		}
+
 	}
 }
 
