@@ -184,22 +184,13 @@ void main()
 		t = tNearFar.y+1; //offset the near intersection to remove the depth artifacts
 
 		val=vec4(t,0,0,0);
-		/*
-		for(int i=0;i<int(NO_OF_TRIANGLES);i++)
-		{
-			vec3 normal;
-			vec4 res = intersectTriangle(eyeRay.origin, eyeRay.dir, i, normal);
-		 	if(res.x>0 && res.x <= val.x) {
-			   val = res;
-			   N = normal;
-		    }
-		}*/
+
 		bool intersectFound = closestIntersectingTriangle(eyeRay, val, N);
 		
 		if(intersectFound) {
 
 			vec3 hit = eyeRay.origin + eyeRay.dir*val.x;
-            N = normalize( N * (1 - val.y - val.z) + N * val.y + N * val.z);
+         //   N = normalize( N * (1 - val.y - val.z) + N * val.y + N * val.z);
 			vec3 L = (lightPos-hit);
 			float d = length(L);
 			L = normalize(L);

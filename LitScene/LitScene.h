@@ -106,7 +106,7 @@ public:
 	virtual void init() override {
 		_motionEventHandler = new Chain3DMotionEventHandler({ new LightController(light[0]), new CamController(yaw, pitch) });
 		font = Font::Arial(12);
-		model = new Model("..\\media\\blocks.obj");
+		model = new Model("..\\media\\Game_model.obj", true, 100);
 		initQuad();
 		buildTBOs();
 		initRayTraceImage();
@@ -193,27 +193,32 @@ public:
 		Mesh mesh;
 		vector<vec4> uniqueVertices;
 		vector<int> newIndices;
-		for (int i = 0; i < vertices.size(); i++) {
-			vec4 vo = vertices[i];
-			auto itr = find_if(uniqueVertices.begin(), uniqueVertices.end(), [&](vec4& v1) {
-				return vo.x == v1.x && vo.y == v1.y && vo.z == v1.z && vo.w == v1.w;
-			});
-			if (itr == uniqueVertices.end()) {
-				uniqueVertices.push_back(vo);
-				mesh.positions.push_back(vo.xyz);
-				mesh.normals.push_back(normals[i]);
-			}
+		if (meshes.size() == 1) {
+			uniqueVertices = vertices;
 		}
+		else {
+			for (int i = 0; i < vertices.size(); i++) {
+				vec4 vo = vertices[i];
+				auto itr = find_if(uniqueVertices.begin(), uniqueVertices.end(), [&](vec4& v1) {
+					return vo.x == v1.x && vo.y == v1.y && vo.z == v1.z && vo.w == v1.w;
+				});
+				if (itr == uniqueVertices.end()) {
+					uniqueVertices.push_back(vo);
+					mesh.positions.push_back(vo.xyz);
+					mesh.normals.push_back(normals[i]);
+				}
+			}
 
-		for (int i = 0; i < uniqueVertices.size(); i++) {
-			set<int> tIndices;
-			vec4 vo = uniqueVertices[i];
-			for (int j = 0; j < indices.size(); j++) {
-				if ((j+1) % 4 == 0) continue;
-				int idx = indices[j];
-				vec4 v1 = vertices[idx];
-				if ((vo.x == v1.x && vo.y == v1.y && vo.z == v1.z && vo.w == v1.w)) {
-					indices[j] = i;
+			for (int i = 0; i < uniqueVertices.size(); i++) {	 // Do this in the same pass as unique vertices
+				set<int> tIndices;
+				vec4 vo = uniqueVertices[i];
+				for (int j = 0; j < indices.size(); j++) {
+					if ((j + 1) % 4 == 0) continue;
+					int idx = indices[j];
+					vec4 v1 = vertices[idx];
+					if ((vo.x == v1.x && vo.y == v1.y && vo.z == v1.z && vo.w == v1.w)) {
+						indices[j] = i;
+					}
 				}
 			}
 		}
@@ -227,11 +232,22 @@ public:
 			triangle_ssbo.triangles.push_back(tri);
 		}
 
+		size_t size = sizeOf(triangle_ssbo);
+		float data[4];
+		stringstream ss;
+		ss << "sizeof(buf_vec4): " << sizeof(buf_vec4);
+		ss << "\nsizeof(Material): " << sizeof(ray_tracing::Material);
+		ss << "\nsizeof(Triangle): " << sizeof(ray_tracing::Triangle);
+		ss << "\nsizeof(SSBOTriangleData): " << sizeof(ray_tracing::Triangle) * triangle_ssbo.triangles.size() ;
+		ss << "\nactual size: " << size << endl;
+		ss << "\nexpected size:" << (sizeof(buf_vec4) * 3 + sizeof(data) * 5 + sizeof(float) * 4) * 38;
+		logger.info(ss.str());
 		glGenBuffers(1, &tri_ssbo);
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, tri_ssbo);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeOf(triangle_ssbo), NULL, GL_DYNAMIC_COPY);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, size, NULL, GL_DYNAMIC_COPY);
+		glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeOf(triangle_ssbo), &triangle_ssbo.triangles[0]);
 
-		model2 = new ProvidedMesh(mesh);
+	//	model2 = new ProvidedMesh(mesh);
 		vertices_tbo = new TextureBuffer("vertices_tbo", &uniqueVertices[0], sizeof(vec4) * uniqueVertices.size(), GL_RGBA32F, 1);
 		triangle_tbo = new TextureBuffer("triangle_tbo", &indices[0], sizeof(int) * indices.size(), GL_RGBA32I, 2);
 		forShaders({ "raytrace", "pathtrace" }, [&](Shader& s) {	
@@ -344,9 +360,6 @@ public:
 		mat4 invMVP = inverse(cam.projection * cam.view);
 		vec3 eyes = column(invMV, 3).xyz;
 		shader("raytrace")([&](Shader& s) {
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, tri_ssbo);
-			glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, sizeOf(triangle_ssbo), &triangle_ssbo.triangles[0]);
-			
 			glActiveTexture(GL_TEXTURE0);
 			glBindImageTexture(0, scene_img, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 			s.sendUniform1ui("scene_img", scene_img);
@@ -374,7 +387,6 @@ public:
 		mat4 invMVP = inverse(cam.projection * cam.view);
 		vec3 eyes = column(invMV, 3).xyz;
 		float currentTime = Timer::get().now();
-		logger.info("currentTime: " + to_string(currentTime));
 		shader("pathtrace")([&](Shader& s) {
 			glActiveTexture(GL_TEXTURE0);
 			glBindImageTexture(0, scene_img, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);

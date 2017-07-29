@@ -168,7 +168,11 @@ vec3 tracepath(vec3 origin, vec3 ray, vec3 light, float t){
 
 			vec3 hit = origin + ray * val.x;
 			origin = hit;
-			ray = uniformlyRandomDirection(seed + float(bounce));
+			if(val.w== 255){
+			    ray = normalize(reflect(ray, N));
+			}else{
+			    ray = uniformlyRandomDirection(seed + float(bounce));
+			}
 
 			vec3 jitteredLight = light + ray;
 			vec3 L = normalize(jitteredLight - hit);
