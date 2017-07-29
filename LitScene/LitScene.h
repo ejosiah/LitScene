@@ -106,7 +106,7 @@ public:
 	virtual void init() override {
 		_motionEventHandler = new Chain3DMotionEventHandler({ new LightController(light[0]), new CamController(yaw, pitch) });
 		font = Font::Arial(12);
-		model = new Model("..\\media\\Game_model.obj", true, 100);
+		model = new Model("..\\media\\blocks.obj");
 		initQuad();
 		buildTBOs();
 		initRayTraceImage();
